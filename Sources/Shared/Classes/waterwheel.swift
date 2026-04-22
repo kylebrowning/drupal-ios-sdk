@@ -1,576 +1,477 @@
 //
 //  waterwheel.swift
 //
-//  Created by Kyle Browning on 1/25/16.
-//  Copyright © 2016 Kyle Browning. All rights reserved.
+//  Waterwheel 5.x — Swift SDK for the Drupal RESTful Web Services API.
+//  Targets Drupal 10 / 11 core REST module. Pure Foundation, no third-party deps.
+//
+//  Docs: https://www.drupal.org/docs/drupal-apis/restful-web-services-api/restful-web-services-api-overview
 //
 
-import SwiftyJSON
-import SwiftyUserDefaults
-import Alamofire
+import Foundation
 
-extension DefaultsKeys {
-    static let basicUsername = DefaultsKey<String?>("basicUsername")
-    static let basicPassword = DefaultsKey<String?>("basicPassword")
-    static let logoutToken = DefaultsKey<String?>("logoutToken")
-    static let csrfToken = DefaultsKey<String?>("csrfToken")
-    static let signRequestsBasic = DefaultsKey<Bool?>("signRequestsBasic")
-    static let signCSRFToken = DefaultsKey<Bool?>("signCSRFToken")
-    static let isLoggedIn = DefaultsKey<Bool?>("isLoggedIn")
-}
+// MARK: - Public types
 
-public enum EntityType: String {
-    case Node = "node", Comment = "comment"
-}
+/// Content entity types exposed by the Drupal core REST module. Extend as needed.
+public enum EntityType: String, Sendable {
+    case node
+    case comment
+    case user
+    case taxonomyTerm = "taxonomy_term"
+    case mediaItem = "media"
+    case file
 
-public enum waterwheelNotifications: String {
-    case waterwheelDidLogin
-    case waterwheelDidLogout
-    case waterwheelDidStartRequest
-    case waterwheelDidFinishRequest
-}
-
-public enum waterwheelNotificationsTypes: String {
-    case checkLoginStatus
-    case login
-    case logout
-    case getCSRF
-    case normalRequest
-}
-
-// MARK: - Typelias definitions
-
-public typealias completion = (_ success: Bool, _ response: DataResponse<Any>?, _ json: JSON?, _ error: NSError?) -> Void
-public typealias stringcompletion = (_ success: Bool, _ response: DataResponse<String>?, _ json: JSON?, _ error: NSError?) -> Void
-public typealias paramType = [String: AnyObject]?
-
-private let waterwheelErrorString = "waterhwheel error: "
-
-/**
- Responsible for storing state and variables for waterwheel.
- */
-open class waterwheelManager {
-
-    // MARK: - Properties
-
-    /**
-     A shared instance of `waterwheelManager`
-     */
-    open static let sharedInstance: waterwheelManager = {
-        return waterwheelManager(basicUsername: "", basicPassword: "", logoutToken: "", CSRFToken: "", signRequestsBasic: false, signCSRFToken: false, isLoggedIn: false)
-    }()
-
-    open let requestFormat = "_format=json"
-    open var headers = [
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    ]
-    open var URL: String = ""
-    fileprivate var basicUsername: String = ""
-    fileprivate var basicPassword: String = ""
-    fileprivate var logoutToken: String = ""
-    fileprivate var CSRFToken: String = ""
-    fileprivate var signRequestsBasic: Bool = false
-    fileprivate var signCSRFToken: Bool = false
-    open var isLoggedIn: Bool = false
-
-    /**
-     Initializes the `waterwheel` instance with the our defaults.
-     - returns: The new `waterwheel` instance.
-     */
-    public init(basicUsername: String, basicPassword: String, logoutToken: String, CSRFToken: String, signRequestsBasic: Bool, signCSRFToken: Bool, isLoggedIn: Bool) {
-
-        if let basicUsername = Defaults[.basicUsername] {
-            self.basicUsername = basicUsername
-        } else {
-            self.basicUsername = ""
-        }
-        if let basicPassword = Defaults[.basicPassword] {
-            self.basicPassword = basicPassword
-        } else {
-            self.basicPassword = ""
-        }
-
-        if let logoutToken = Defaults[.logoutToken] {
-            self.logoutToken = logoutToken
-        } else {
-            self.logoutToken = ""
-        }
-
-        if let CSRFToken = Defaults[.csrfToken] {
-            self.CSRFToken = CSRFToken
-        } else {
-            self.CSRFToken = ""
-        }
-
-        if let signRequestsBasic = Defaults[.signRequestsBasic] {
-            self.signRequestsBasic = signRequestsBasic
-        } else {
-            self.signRequestsBasic = false
-        }
-
-        if let signCSRFToken = Defaults[.signCSRFToken] {
-            self.signCSRFToken = signCSRFToken
-        } else {
-            self.signRequestsBasic = false
-        }
-
-        if let isLoggedIn = Defaults[.isLoggedIn] {
-            self.isLoggedIn = isLoggedIn
-        } else {
-            self.isLoggedIn = false
+    /// Canonical URL fragment for the entity type. Most entities have a canonical URL
+    /// of `/{type}/{id}`; those that do not fall back to `/entity/{type}/{id}`.
+    var canonicalPath: String {
+        switch self {
+        case .node, .user, .file, .mediaItem:
+            return rawValue
+        case .comment, .taxonomyTerm:
+            return "entity/\(rawValue)"
         }
     }
 }
 
-/**
- Sets the URL for all requests to be sent against.
-
- - parameter drupalURL:         The URL for the Drupal Site
-
- */
-public func setDrupalURL(_ drupalURL: String) {
-    assert(drupalURL != "", waterwheelErrorString + "Missing Drupal URL")
-    waterwheelManager.sharedInstance.URL = drupalURL
-    waterwheel.checkLoginStatus()
+/// Authentication modes supported by the core REST module.
+public enum Authentication: Sendable {
+    case none
+    case cookie
+    case basic(username: String, password: String)
+    case bearer(token: String)
 }
 
-/**
- public function to check Login Status with all cookies that have been set.
+public enum WaterwheelError: Error, LocalizedError {
+    case missingBaseURL
+    case invalidURL(String)
+    case invalidResponse
+    case http(status: Int, body: Data?)
+    case decoding(Error)
+    case missingCSRFToken
 
- */
-public func checkLoginStatus() {
-    postNotification(waterwheelNotifications.waterwheelDidStartRequest.rawValue, requestName: waterwheelNotificationsTypes.checkLoginStatus.rawValue, object: nil)
-    let urlString = waterwheelManager.sharedInstance.URL + "/user/login_status?" + waterwheelManager.sharedInstance.requestFormat
-    Alamofire.request(urlString)
-            .validate(statusCode: 200..<300)
-            .responseString { response in
-                if (response.result.error == nil) {
-                    let loginStatus = String(data: response.data!, encoding: String.Encoding.utf8)
-                    if (loginStatus == "1") {
-                        setIsLoggedIn(true)
-                    } else {
-                        setIsLoggedIn(false)
-                    }
-                } else {
-                    setIsLoggedIn(false)
-                }
-                postNotification(waterwheelNotifications.waterwheelDidFinishRequest.rawValue, requestName: waterwheelNotificationsTypes.checkLoginStatus.rawValue, object: response.response)
+    public var errorDescription: String? {
+        switch self {
+        case .missingBaseURL:
+            return "Waterwheel: base URL has not been set. Call Waterwheel.shared.configure(baseURL:)."
+        case .invalidURL(let s):
+            return "Waterwheel: invalid URL \(s)."
+        case .invalidResponse:
+            return "Waterwheel: the server returned an invalid response."
+        case .http(let status, _):
+            return "Waterwheel: HTTP \(status)."
+        case .decoding(let e):
+            return "Waterwheel: failed to decode response (\(e.localizedDescription))."
+        case .missingCSRFToken:
+            return "Waterwheel: CSRF token is required for this request but is not available."
+        }
+    }
+}
+
+public struct LoginResponse: Decodable, Sendable {
+    public let csrfToken: String?
+    public let logoutToken: String?
+    public let currentUser: CurrentUser?
+
+    enum CodingKeys: String, CodingKey {
+        case csrfToken = "csrf_token"
+        case logoutToken = "logout_token"
+        case currentUser = "current_user"
+    }
+
+    public struct CurrentUser: Decodable, Sendable {
+        public let uid: String?
+        public let name: String?
+        public let roles: [String]?
+    }
+}
+
+/// Notification names posted on the main queue around request lifecycle events.
+public extension Notification.Name {
+    static let waterwheelDidLogin        = Notification.Name("waterwheelDidLogin")
+    static let waterwheelDidLogout       = Notification.Name("waterwheelDidLogout")
+    static let waterwheelDidStartRequest = Notification.Name("waterwheelDidStartRequest")
+    static let waterwheelDidFinishRequest = Notification.Name("waterwheelDidFinishRequest")
+}
+
+// MARK: - Waterwheel
+
+/// Thread-safe singleton client for talking to a Drupal REST backend.
+/// Use `Waterwheel.shared.configure(baseURL:)` once at app launch, then call the
+/// async methods on ``Waterwheel``. A closure-based compatibility API is
+/// provided in ``WaterwheelCompat`` below.
+public final class Waterwheel: @unchecked Sendable {
+
+    public static let shared = Waterwheel()
+
+    private let lock = NSLock()
+    private let session: URLSession
+    private let defaults = UserDefaults.standard
+
+    private var _baseURL: URL?
+    private var _authentication: Authentication = .none
+    private var _csrfToken: String?
+    private var _logoutToken: String?
+
+    private enum Keys {
+        static let baseURL    = "waterwheel.baseURL"
+        static let csrfToken  = "waterwheel.csrfToken"
+        static let logoutToken = "waterwheel.logoutToken"
+        static let isLoggedIn = "waterwheel.isLoggedIn"
+        static let basicUser  = "waterwheel.basicUsername"
+        static let basicPass  = "waterwheel.basicPassword"
+    }
+
+    private init() {
+        let config = URLSessionConfiguration.default
+        config.httpCookieAcceptPolicy = .always
+        config.httpShouldSetCookies = true
+        config.httpCookieStorage = HTTPCookieStorage.shared
+        self.session = URLSession(configuration: config)
+
+        if let stored = defaults.string(forKey: Keys.baseURL), let url = URL(string: stored) {
+            self._baseURL = url
+        }
+        self._csrfToken = defaults.string(forKey: Keys.csrfToken)
+        self._logoutToken = defaults.string(forKey: Keys.logoutToken)
+
+        if let user = defaults.string(forKey: Keys.basicUser),
+           let pass = defaults.string(forKey: Keys.basicPass),
+           !user.isEmpty {
+            self._authentication = .basic(username: user, password: pass)
+        }
+    }
+
+    // MARK: Configuration
+
+    /// Set the Drupal site's base URL, e.g. `https://example.com`.
+    public func configure(baseURL: URL) {
+        lock.lock(); defer { lock.unlock() }
+        _baseURL = baseURL
+        defaults.set(baseURL.absoluteString, forKey: Keys.baseURL)
+    }
+
+    /// Select an authentication mode for subsequent requests.
+    public func setAuthentication(_ auth: Authentication) {
+        lock.lock(); defer { lock.unlock() }
+        _authentication = auth
+        switch auth {
+        case .basic(let u, let p):
+            defaults.set(u, forKey: Keys.basicUser)
+            defaults.set(p, forKey: Keys.basicPass)
+            defaults.set(true, forKey: Keys.isLoggedIn)
+        case .none:
+            defaults.removeObject(forKey: Keys.basicUser)
+            defaults.removeObject(forKey: Keys.basicPass)
+            defaults.set(false, forKey: Keys.isLoggedIn)
+        default:
+            break
+        }
+    }
+
+    public var baseURL: URL? {
+        lock.lock(); defer { lock.unlock() }
+        return _baseURL
+    }
+
+    public var isLoggedIn: Bool {
+        defaults.bool(forKey: Keys.isLoggedIn)
+    }
+
+    public var csrfToken: String? {
+        lock.lock(); defer { lock.unlock() }
+        return _csrfToken
+    }
+
+    // MARK: Authentication
+
+    /// Log a user in using the cookie-based `/user/login?_format=json` endpoint.
+    /// Stores the returned CSRF + logout tokens. Session cookie is kept by
+    /// `HTTPCookieStorage.shared`.
+    @discardableResult
+    public func login(username: String, password: String) async throws -> LoginResponse {
+        let url = try endpoint("user/login", query: ["_format": "json"])
+        let body = try JSONEncoder().encode(["name": username, "pass": password])
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = body
+
+        NotificationCenter.default.post(name: .waterwheelDidStartRequest, object: nil)
+        defer { NotificationCenter.default.post(name: .waterwheelDidFinishRequest, object: nil) }
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+
+        let decoded = try JSONDecoder().decode(LoginResponse.self, from: data)
+
+        lock.lock()
+        _authentication = .cookie
+        _csrfToken = decoded.csrfToken
+        _logoutToken = decoded.logoutToken
+        defaults.set(decoded.csrfToken, forKey: Keys.csrfToken)
+        defaults.set(decoded.logoutToken, forKey: Keys.logoutToken)
+        defaults.set(true, forKey: Keys.isLoggedIn)
+        lock.unlock()
+
+        NotificationCenter.default.post(name: .waterwheelDidLogin, object: nil)
+        return decoded
+    }
+
+    /// Log out the current cookie-authenticated user.
+    public func logout() async throws {
+        let token = lock.withLock { _logoutToken } ?? ""
+        let url = try endpoint("user/logout", query: ["_format": "json", "token": token])
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        applyAuth(to: &request, isMutation: false)
+
+        NotificationCenter.default.post(name: .waterwheelDidStartRequest, object: nil)
+        defer { NotificationCenter.default.post(name: .waterwheelDidFinishRequest, object: nil) }
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+
+        lock.lock()
+        _authentication = .none
+        _csrfToken = nil
+        _logoutToken = nil
+        defaults.removeObject(forKey: Keys.csrfToken)
+        defaults.removeObject(forKey: Keys.logoutToken)
+        defaults.set(false, forKey: Keys.isLoggedIn)
+        lock.unlock()
+
+        // Also clear any session cookies for the site.
+        if let base = baseURL, let cookies = HTTPCookieStorage.shared.cookies(for: base) {
+            cookies.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+        }
+
+        NotificationCenter.default.post(name: .waterwheelDidLogout, object: nil)
+    }
+
+    /// Fetch and cache a CSRF token from `/session/token`. Drupal requires this
+    /// for any unsafe (POST / PATCH / DELETE) request on a session-authenticated
+    /// client.
+    @discardableResult
+    public func refreshCSRFToken() async throws -> String {
+        let url = try endpoint("session/token")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("text/plain", forHTTPHeaderField: "Accept")
+        applyAuth(to: &request, isMutation: false)
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+
+        guard let token = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            throw WaterwheelError.missingCSRFToken
+        }
+
+        lock.lock()
+        _csrfToken = token
+        defaults.set(token, forKey: Keys.csrfToken)
+        lock.unlock()
+        return token
+    }
+
+    // MARK: Entity CRUD
+
+    /// GET `/{entity}/{id}?_format=json`.
+    public func get(_ entity: EntityType, id: String, query: [String: String] = [:]) async throws -> Data {
+        var q = query
+        q["_format"] = "json"
+        let url = try endpoint("\(entity.canonicalPath)/\(id)", query: q)
+        return try await perform(method: "GET", url: url, body: nil)
+    }
+
+    /// POST to `/entity/{type}?_format=json` — the canonical "create" URL.
+    public func create<T: Encodable>(_ entity: EntityType, body: T) async throws -> Data {
+        let url = try endpoint("entity/\(entity.rawValue)", query: ["_format": "json"])
+        let data = try JSONEncoder().encode(body)
+        return try await perform(method: "POST", url: url, body: data)
+    }
+
+    /// PATCH `/{entity}/{id}?_format=json`.
+    public func update<T: Encodable>(_ entity: EntityType, id: String, body: T) async throws -> Data {
+        let url = try endpoint("\(entity.canonicalPath)/\(id)", query: ["_format": "json"])
+        let data = try JSONEncoder().encode(body)
+        return try await perform(method: "PATCH", url: url, body: data)
+    }
+
+    /// DELETE `/{entity}/{id}?_format=json`.
+    public func delete(_ entity: EntityType, id: String) async throws {
+        let url = try endpoint("\(entity.canonicalPath)/\(id)", query: ["_format": "json"])
+        _ = try await perform(method: "DELETE", url: url, body: nil)
+    }
+
+    // MARK: Generic helpers
+
+    /// Convenience for Views (rest_export) endpoints.
+    public func view(at path: String, query: [String: String] = [:]) async throws -> Data {
+        var q = query
+        q["_format"] = "json"
+        let url = try endpoint(path, query: q)
+        return try await perform(method: "GET", url: url, body: nil)
+    }
+
+    /// Low-level request. Prefer the typed helpers above.
+    public func request(path: String,
+                        method: String,
+                        query: [String: String] = [:],
+                        body: Data? = nil) async throws -> Data {
+        let url = try endpoint(path, query: query)
+        return try await perform(method: method, url: url, body: body)
+    }
+
+    /// Decodes the response body directly into a `Decodable` type.
+    public func requestDecoded<T: Decodable>(_ type: T.Type,
+                                             path: String,
+                                             method: String = "GET",
+                                             query: [String: String] = [:],
+                                             body: Data? = nil) async throws -> T {
+        let data = try await request(path: path, method: method, query: query, body: body)
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw WaterwheelError.decoding(error)
+        }
+    }
+
+    // MARK: Private
+
+    private func perform(method: String, url: URL, body: Data?) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if body != nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+        }
+
+        let isMutation = !(method == "GET" || method == "HEAD" || method == "OPTIONS")
+        if isMutation {
+            try await ensureCSRFToken()
+        }
+        applyAuth(to: &request, isMutation: isMutation)
+
+        NotificationCenter.default.post(name: .waterwheelDidStartRequest, object: nil)
+        defer { NotificationCenter.default.post(name: .waterwheelDidFinishRequest, object: nil) }
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        return data
+    }
+
+    private func ensureCSRFToken() async throws {
+        let token = lock.withLock { _csrfToken }
+        if token == nil || token?.isEmpty == true {
+            _ = try await refreshCSRFToken()
+        }
+    }
+
+    private func applyAuth(to request: inout URLRequest, isMutation: Bool) {
+        let auth = lock.withLock { _authentication }
+        switch auth {
+        case .none:
+            break
+        case .cookie:
+            if isMutation, let t = lock.withLock({ _csrfToken }), !t.isEmpty {
+                request.setValue(t, forHTTPHeaderField: "X-CSRF-Token")
             }
-}
-
-// MARK: - Authentication methods
-
-/**
- Allows a username and password to be set for Basic Auth
-
- - parameter username:          The username to login with.
- - parameter password:          The password to login with
-
- */
-public func setBasicAuthUsernameAndPassword(_ username: String, password: String, sign: Bool) {
-    waterwheelManager.sharedInstance.basicUsername = username
-    waterwheelManager.sharedInstance.basicPassword = password
-    waterwheelManager.sharedInstance.signRequestsBasic = sign
-    Defaults[.basicUsername] = username
-    Defaults[.basicPassword] = password
-    Defaults[.signRequestsBasic] = true
-    setIsLoggedIn(true)
-}
-
-/**
- Login
-
- - parameter username:          The username to login with.
- - parameter password:          The password to login with
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
-
- */
-public func login(username: String?, password: String?, completionHandler: completion?) {
-
-    assert(username! != "", waterwheelErrorString + "Missing username.")
-    assert(password! != "", waterwheelErrorString + "Missing password.")
-
-    let body = [
-        "name": username!,
-        "pass": password!
-    ]
-
-    postNotification(waterwheelNotifications.waterwheelDidStartRequest.rawValue, requestName: waterwheelNotificationsTypes.login.rawValue, object: nil)
-
-    sendRequest("user/login", method: .post, params: body as paramType) { (success, response, json, error) in
-        switch response!.result {
-        case .success( _):
-            let csrfToken = json!["csrf_token"].string
-            let logoutToken = json!["logout_token"].string
-            setCSRF(csrfToken!, sign: true)
-            setLogoutToken(logoutToken!)
-            waterwheel.setIsLoggedIn(true)
-            completionHandler?(true, response, json, nil)
-        case .failure(let error):
-            completionHandler?(false, response, nil, error as NSError?)
+        case .basic(let user, let pass):
+            let raw = "\(user):\(pass)".data(using: .utf8) ?? Data()
+            request.setValue("Basic \(raw.base64EncodedString())", forHTTPHeaderField: "Authorization")
+        case .bearer(let token):
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        postNotification(waterwheelNotifications.waterwheelDidFinishRequest.rawValue, requestName: waterwheelNotificationsTypes.login.rawValue, object: response?.response)
     }
-}
 
-/**
- Logout a user
-
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func logout(completionHandler: completion?) {
-    if waterwheelManager.sharedInstance.signRequestsBasic {
-        waterwheelManager.sharedInstance.basicUsername = ""
-        waterwheelManager.sharedInstance.basicPassword = ""
-        waterwheelManager.sharedInstance.signRequestsBasic = false
-        return
-    }
-    postNotification(waterwheelNotifications.waterwheelDidFinishRequest.rawValue, requestName: waterwheelNotificationsTypes.login.rawValue, object: nil)
-
-    let urlString = waterwheelManager.sharedInstance.URL + "/user/logout?" + waterwheelManager.sharedInstance.requestFormat + "&token=" + waterwheelManager.sharedInstance.logoutToken
-    sendRequestWithUrl(urlString, method: .post, params: nil) { (_, response, _, error) in
-        if (response!.result.error == nil) {
-            setCSRF("", sign: false)
-            setIsLoggedIn(false)
-            completionHandler?(true, response, nil, response!.result.error as NSError?)
-        } else {
-            completionHandler?(false, response, nil, response!.result.error as NSError?)
+    private func endpoint(_ path: String, query: [String: String] = [:]) throws -> URL {
+        guard let base = baseURL else { throw WaterwheelError.missingBaseURL }
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            throw WaterwheelError.invalidURL(base.absoluteString)
         }
-        postNotification(waterwheelNotifications.waterwheelDidFinishRequest.rawValue, requestName: waterwheelNotificationsTypes.login.rawValue, object: response?.response)
+        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        let existing = components.path.hasSuffix("/") ? components.path : components.path + "/"
+        components.path = existing + trimmed
+        if !query.isEmpty {
+            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        guard let url = components.url else {
+            throw WaterwheelError.invalidURL(components.string ?? path)
+        }
+        return url
+    }
+
+    private static func validate(response: URLResponse, data: Data) throws {
+        guard let http = response as? HTTPURLResponse else { throw WaterwheelError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            throw WaterwheelError.http(status: http.statusCode, body: data)
+        }
     }
 }
 
-/**
+// MARK: - NSLock convenience
 
- Private function to get the CSRF Token
+private extension NSLock {
+    func withLock<T>(_ body: () -> T) -> T {
+        lock(); defer { unlock() }
+        return body()
+    }
+}
 
- */
-private func getCSRFToken(_ completionHandler: stringcompletion?) {
-    let urlString = waterwheelManager.sharedInstance.URL + "/rest/session/token"
-    Alamofire.request(urlString)
-            .validate(statusCode: 200..<300)
-            .responseString { response in
-                if (response.result.error == nil) {
-                    let csrfToken = String(data: response.data!, encoding: String.Encoding.utf8)
-                    setCSRF(csrfToken!, sign: true)
-                    completionHandler?(true, response, nil, nil)
-                } else {
-                    completionHandler?(false, response, nil, response.result.error as NSError?)
-                }
+// MARK: - Closure-based compatibility API (deprecated; bridges pre-5.x callers)
+
+public typealias WaterwheelCompletion = (_ success: Bool, _ data: Data?, _ error: Error?) -> Void
+
+public enum WaterwheelCompat {
+
+    @available(*, deprecated, message: "Use Waterwheel.shared.configure(baseURL:)")
+    public static func setDrupalURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        Waterwheel.shared.configure(baseURL: url)
+    }
+
+    @available(*, deprecated, message: "Use Waterwheel.shared.setAuthentication(.basic(...))")
+    public static func setBasicAuth(username: String, password: String) {
+        Waterwheel.shared.setAuthentication(.basic(username: username, password: password))
+    }
+
+    @available(*, deprecated, message: "Use `try await Waterwheel.shared.login(username:password:)`")
+    public static func login(username: String, password: String, completion: WaterwheelCompletion?) {
+        Task {
+            do {
+                _ = try await Waterwheel.shared.login(username: username, password: password)
+                completion?(true, nil, nil)
+            } catch {
+                completion?(false, nil, error)
             }
-}
-
-// MARK: - Requests
-
-/**
- Sends a request to Drupal with a specified path
-
- - parameter path:              The path for the request.
- - parameter method:            The method, eg, GET, POST etc.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func sendRequest(_ path: String, method: Alamofire.HTTPMethod, params: paramType, completionHandler: completion?) {
-    assert(waterwheelManager.sharedInstance.URL != "", "waterwheel Error: Mission Drupal URL. Did you set it properly?")
-
-    var urlString = waterwheelManager.sharedInstance.URL + "/" + path// + waterwheelManager.sharedInstance.requestFormat
-
-    if urlString.range(of: "?") == nil {
-        urlString = urlString + "?" + waterwheelManager.sharedInstance.requestFormat
-    } else {
-        urlString = urlString + "&" + waterwheelManager.sharedInstance.requestFormat
-    }
-
-    sendRequestWithUrl(urlString, method: method, params: params, completionHandler: completionHandler)
-}
-
-/**
- Sends a request to Drupal with an already generated URL
-
- - parameter path:              The path for the request.
- - parameter method:            The method, eg, GET, POST etc.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func sendRequestWithUrl(_ urlString: String, method: Alamofire.HTTPMethod, params: paramType, completionHandler: completion?) {
-
-    assert(urlString != "", "waterwheel Error: Missing Drupal URL")
-    postNotification(waterwheelNotifications.waterwheelDidStartRequest.rawValue, requestName: waterwheelNotificationsTypes.normalRequest.rawValue, object: nil)
-    if (waterwheelManager.sharedInstance.signRequestsBasic == true) {
-
-        let plainString = waterwheelManager.sharedInstance.basicUsername + ":" + waterwheelManager.sharedInstance.basicPassword
-        let credentialData = plainString.data(using: String.Encoding.utf8)!
-        let base64String = credentialData.base64EncodedString(options: NSData.Base64EncodingOptions([]))
-
-        waterwheelManager.sharedInstance.headers["Authorization"] = "Basic \(base64String)"
-    }
-    if (waterwheelManager.sharedInstance.signCSRFToken == true) {
-        waterwheelManager.sharedInstance.headers["X-CSRF-Token"] = waterwheelManager.sharedInstance.CSRFToken
-    }
-    Alamofire.request(urlString, method: method, parameters: params, encoding:JSONEncoding.default, headers:waterwheelManager.sharedInstance.headers).validate().responseJSON { (response) in
-        var responseJSON: JSON
-        if response.result.isFailure {
-            responseJSON = JSON.null
-        } else {
-            responseJSON = SwiftyJSON.JSON(response.result.value!)
-        }
-        switch response.result {
-        case .success( _):
-            completionHandler?(true, response, responseJSON, nil)
-        case .failure(let error):
-            completionHandler?(false, response, nil, error as NSError?)
-        }
-        postNotification(waterwheelNotifications.waterwheelDidFinishRequest.rawValue, requestName: waterwheelNotificationsTypes.normalRequest.rawValue, object: response.response)
-    }
-}
-
-// MARK: - GET Requests
-
-/**
- Sends a GET request to Drupal
-
- - parameter requestPath:       The path for the .GET request.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-public func get(_ requestPath: String, params: paramType, completionHandler: completion?) {
-
-    var ultimateRequestPath = requestPath
-
-    if params != nil {
-        let getParams = params!.map( { key, value -> String in
-            return "\(key)=\(value)"
-        }).joined(separator: "&")
-
-        if getParams != "" {
-            ultimateRequestPath = requestPath + "?" + getParams
         }
     }
 
-    sendRequest(ultimateRequestPath, method: .get, params: nil) { (success, response, json, error) in
-        completionHandler?(success, response, json, error)
+    @available(*, deprecated, message: "Use `try await Waterwheel.shared.logout()`")
+    public static func logout(completion: WaterwheelCompletion?) {
+        Task {
+            do {
+                try await Waterwheel.shared.logout()
+                completion?(true, nil, nil)
+            } catch {
+                completion?(false, nil, error)
+            }
+        }
     }
-}
 
-/**
- Sends a GET Entity request to Drupal
-
- - parameter entityType:        The Entity Type to request.
- - parameter entityId:          The entity ID to GET
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-public func entityGet(entityType: EntityType, entityId: String, params: paramType, completionHandler: completion?) {
-    let requestPath = entityType.rawValue + "/" + entityId
-    get(requestPath, params: params, completionHandler: completionHandler)
-}
-
-/**
- Sends a GET Node request to Drupal
-
- - parameter nodeId:            The entity ID to GET
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-public func nodeGet(nodeId: String, params: paramType, completionHandler: completion?) {
-    entityGet(entityType: .Node, entityId: nodeId, params: params, completionHandler: completionHandler)
-}
-
-// MARK: - POST Requests
-
-/**
- Sends a POST request to Drupal
-
- - parameter requestPath:       The path for the .POST request.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-public func post(_ requestPath: String, params: paramType, completionHandler: completion?) {
-    sendRequest(requestPath, method: .post, params: params) { (success, response, json, error) in
-        completionHandler?(success, response, json, error)
+    @available(*, deprecated, message: "Use `try await Waterwheel.shared.get(_:id:)`")
+    public static func nodeGet(id: String, completion: WaterwheelCompletion?) {
+        Task {
+            do {
+                let data = try await Waterwheel.shared.get(.node, id: id)
+                completion?(true, data, nil)
+            } catch {
+                completion?(false, nil, error)
+            }
+        }
     }
-}
-
-/**
- Sends a POST request to Drupal that will create an Entity
-
- - parameter entityType:        The Entity Type to request.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func entityPost(entityType: EntityType, params: paramType, completionHandler: completion?) {
-    let requestPath = "entity/" + entityType.rawValue
-    post(requestPath, params: params, completionHandler: completionHandler)
-}
-
-/**
- Sends a POST request to Drupal that will create a Node
-
- - parameter entityId:          The entity ID to GET
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public let nodePost: (_ node: paramType, _ completionHandler: completion?) -> Void = { ( params, completionHandler) in
-    entityPost(entityType: .Node, params: params, completionHandler: completionHandler)
-}
-
-// MARK: - PATCH Requests
-
-/**
- Sends a PATCH request to Drupal
-
- - parameter requestPath:       The path to patch
- - parameter params:            The object/parameters to send
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response
-
- */
-
-public func patch(_ requestPath: String, params: paramType, completionHandler: completion?) {
-    sendRequest(requestPath, method: .patch, params: params) { (success, response, json, error) in
-        completionHandler?(success, response, json, error)
-    }
-}
-
-/**
- Sends a PATCH request to Drupal that will update an Entity
-
- - parameter entityType:        The Entity Type to request.
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func entityPatch (entityType: EntityType, entityId: String, params: paramType, completionHandler: completion?) {
-    let requestPath = entityType.rawValue + "/" + entityId
-    patch(requestPath, params: params, completionHandler: completionHandler)
-}
-
-/**
- Sends a PATCH request to Drupal that will update a node
-
- - parameter nodeId:            The node ID to patch
- - parameter node:              The the updated nodeObject
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func nodePatch (nodeId: String, node: paramType, completionHandler: completion?) {
-    entityPatch(entityType: .Node, entityId: nodeId, params: node, completionHandler: completionHandler)
-}
-
-// MARK: - DELETE Requests
-
-/**
- Sends a PATCH request to Drupal
-
- - parameter requestPath:       The path to patch
- - parameter params:            The object/parameters to send
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response
-
- */
-
-public func delete(_ requestPath: String, params: paramType, completionHandler: completion?) {
-    sendRequest(requestPath, method: .delete, params: params) { (success, response, json, error) in
-        completionHandler?(success, response, json, error)
-    }
-}
-
-/**
- Sends a DELETE request to Drupal that will delete an Entity
-
- - parameter entityType:        The Entity Type
- - parameter entityId           The id of the entity
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func entityDelete (entityType: EntityType, entityId: String, params: paramType, completionHandler: completion?) {
-    let requestPath = entityType.rawValue + "/" + entityId
-    delete(requestPath, params: params, completionHandler: completionHandler)
-}
-
-/**
- Sends a DELETE request to Drupal that will delete an Entity
-
- - parameter entityId           The id of the entity
- - parameter params:            The parameters for the request.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func nodeDelete ( nodeId: String, params: paramType, completionHandler: completion?) {
-    entityDelete(entityType: .Node, entityId: nodeId, params: params, completionHandler: completionHandler)
-}
-
-/**
- Gets a view response from Drupal
-
- - parameter viewPath           The path of the view that is set in the views path settings.
- - parameter completionHandler: A completion handler that your delegate method should call if you want the response.
-
- */
-
-public func viewGet (viewPath: String, completionHandler: completion?) {
-    get(viewPath, params: nil, completionHandler: completionHandler)
-}
-
-// MARK: - Helper Functions
-
-/**
- Public function to set Logged in Status
- */
-public func setIsLoggedIn(_ isLoggedIn: Bool) {
-    waterwheelManager.sharedInstance.isLoggedIn = isLoggedIn
-    Defaults[.isLoggedIn] = isLoggedIn
-}
-
-/**
- Public function to check if the user is logged in
-
- */
-public func isLoggedIn() -> Bool {
-    return waterwheelManager.sharedInstance.isLoggedIn
-}
-
-/**
- Public function to set logoutToken
- */
-public func setLogoutToken(_ logoutToken: String) {
-    waterwheelManager.sharedInstance.logoutToken = logoutToken
-    Defaults[.logoutToken] = logoutToken
-}
-
-/**
- public function to set csrf settings
- */
-public func setCSRF(_ csrfToken: String, sign: Bool) {
-    waterwheelManager.sharedInstance.CSRFToken = csrfToken
-    waterwheelManager.sharedInstance.signCSRFToken = sign
-    Defaults[.csrfToken] = csrfToken
-    Defaults[.signCSRFToken] = sign
-}
-
-public func postNotification(_ name: String, requestName: String, object: AnyObject?) {
-    var notification = Dictionary<String, AnyObject>()
-    notification["name"] = name as AnyObject?
-    notification["type"] = requestName as AnyObject?
-    notification["object"] = object
-    NotificationCenter.default.post(name: Notification.Name(rawValue: name), object: notification)
 }

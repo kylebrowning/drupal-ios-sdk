@@ -1,38 +1,31 @@
 Pod::Spec.new do |s|
   s.name         = "waterwheel"
-  s.version      = "4.3.4"
-  s.summary      = "A framework for communicating to Drupal via iOS, macOS, watchOS, or tvOS."
-  s.homepage     = "https://github.com/acquia/waterwheel-swift"
-  s.author       = { "Kyle Browning" => "kylebrowning@me.com"}
-  s.source       = { :git => "https://github.com/acquia/waterwheel-swift.git", :tag => s.version }
+  s.version      = "5.0.0"
+  s.summary      = "Swift SDK for the Drupal 10/11 RESTful Web Services API."
+  s.description  = <<-DESC
+    Waterwheel is a pure-Foundation Swift SDK for talking to a Drupal site over
+    the core RESTful Web Services API. Zero third-party dependencies,
+    async/await, cookie + basic + bearer authentication, automatic CSRF token
+    management, and optional iOS UI helpers (auth button, login VC, views).
+  DESC
+  s.homepage     = "https://github.com/kylebrowning/waterwheel-swift"
+  s.author       = { "Kyle Browning" => "kylebrowning@me.com" }
+  s.source       = { :git => "https://github.com/kylebrowning/waterwheel-swift.git", :tag => s.version }
   s.source_files = 'Sources/**/**/*.swift'
   s.requires_arc = true
 
-  pch_W = <<-EOS
-  #ifndef TARGET_OS_IOS
-    #define TARGET_OS_IOS TARGET_OS_IPHONE
-  #endif
-  #ifndef TARGET_OS_WATCH
-    #define TARGET_OS_WATCH 0
-  #endif
-  #ifndef TARGET_OS_TV
-    #define TARGET_OS_TV 0
-  #endif
-  EOS
+  s.swift_versions = ['5.9']
 
-  s.prefix_header_contents = pch_W
+  s.ios.deployment_target     = '15.0'
+  s.osx.deployment_target     = '12.0'
+  s.tvos.deployment_target    = '15.0'
+  s.watchos.deployment_target = '8.0'
 
-  s.ios.deployment_target = '9.0'
-  s.osx.deployment_target = '10.11'
-  s.tvos.deployment_target = '9.0'
-  s.watchos.deployment_target = '2.0'
-
-  s.osx.exclude_files = 'Sources/iOS'
+  # iOS-only UI helpers are #if os(iOS) guarded, but we still exclude the
+  # directory on non-iOS platforms so the module has fewer files to scan.
+  s.osx.exclude_files     = 'Sources/iOS'
+  s.tvos.exclude_files    = 'Sources/iOS'
   s.watchos.exclude_files = 'Sources/iOS'
 
   s.license  = { :type => 'MPL 1.1/GPL 2.0', :file => "LICENSE" }
-  s.dependency 'Alamofire', '~> 4.0'
-  s.dependency 'ObjectMapper', '~> 2.0'
-  s.dependency 'SwiftyJSON', '3.1.0'
-  s.dependency 'SwiftyUserDefaults'
 end

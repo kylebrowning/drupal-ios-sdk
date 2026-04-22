@@ -1,93 +1,78 @@
 //
 //  waterwheelAuthButton.swift
-//  Only For use in iOS
+//  Waterwheel 5.x — iOS only.
+//
 
+#if os(iOS)
 import UIKit
-import Alamofire
-import SwiftyJSON
 
-/**
- Provide an enum to handle.
-
- - Login:  login Auth Action
- - Logout: logout Auth Action
- */
+/// Button action state.
 public enum AuthAction: String {
-    case Login = "Login", Logout = "Logout"
+    case login
+    case logout
 }
 
-/// A UIButton subclass that will always display the logged in state.
+/// A `UIButton` subclass that stays in sync with ``Waterwheel/isLoggedIn``.
+///
+/// Assign closures to ``didPressLogin`` and ``didPressLogout`` to hook into
+/// the button's taps. The button re-configures itself whenever Waterwheel
+/// posts `waterwheelDidFinishRequest`, so it reflects the latest auth state.
+@available(iOS 15.0, *)
 open class waterwheelAuthButton: UIButton {
 
-    open var didPressLogin: () -> Void = { _ in }
-    open var didPressLogout: (_ success: Bool, _ error: NSError?) -> Void = { success, error in }
+    open var didPressLogin: () -> Void = { }
+    open var didPressLogout: (_ success: Bool, _ error: Error?) -> Void = { _, _ in }
 
-    /**
-      A initializer to handle run once code for the button.
-     */
-    fileprivate func initButton() -> Void {
-        // Incase of logout or login, we attach to the notification Center for the purpose of seeing requests.
+    override public init(frame: CGRect) {
+        super.init(frame: frame)
+        initButton()
+    }
+
+    required public init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+        initButton()
+    }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
+
+    private func initButton() {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(configureButton),
-            name: NSNotification.Name(rawValue: waterwheelNotifications.waterwheelDidFinishRequest.rawValue),
+            name: .waterwheelDidFinishRequest,
             object: nil)
 
-        self.translatesAutoresizingMaskIntoConstraints = false
-        self.setTitleColor(UIButton(type: UIButtonType.system).titleColor(for: UIControlState())!, for: UIControlState())
-        self.configureButton()
-    }
-    /**
-     Override init to setup our button.
-
-     - parameter frame: frame for view
-
-     - returns:
-     */
-    override public init(frame: CGRect) {
-        super.init(frame: frame)
-        self.initButton()
+        translatesAutoresizingMaskIntoConstraints = false
+        setTitleColor(UIButton(type: .system).titleColor(for: .normal), for: .normal)
+        configureButton()
     }
 
-    /**
-     Configures the button for its current state.
-     */
-    open func configureButton() {
-
-        if waterwheel.isLoggedIn() {
-            self.setTitle("Logout", for: UIControlState())
-            self.removeTarget(self, action: #selector(waterwheelAuthButton.loginAction), for: .touchUpInside)
-            self.addTarget(self, action: #selector(waterwheelAuthButton.logoutAction), for: .touchUpInside)
+    @objc open func configureButton() {
+        if Waterwheel.shared.isLoggedIn {
+            setTitle("Logout", for: .normal)
+            removeTarget(self, action: #selector(loginAction), for: .touchUpInside)
+            addTarget(self, action: #selector(logoutAction), for: .touchUpInside)
         } else {
-            self.setTitle("Login", for: UIControlState())
-            self.removeTarget(self, action: #selector(waterwheelAuthButton.logoutAction), for: .touchUpInside)
-            self.addTarget(self, action: #selector(waterwheelAuthButton.loginAction), for: .touchUpInside)
+            setTitle("Login", for: .normal)
+            removeTarget(self, action: #selector(logoutAction), for: .touchUpInside)
+            addTarget(self, action: #selector(loginAction), for: .touchUpInside)
         }
     }
 
-    /// This is required for Swift
-    required public init?(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
-        self.initButton()
-    }
-
-    /**
-     This method provies an action to take when the button is in a logged in state.
-     We automatically log the user out, but provide a closure that can be used to do anything else base on the outcome.
-
-     */
-
-    open func logoutAction() {
-        waterwheel.logout { (success, _, _, error) in
-            self.didPressLogout(success, error)
+    @objc open func logoutAction() {
+        Task { @MainActor in
+            do {
+                try await Waterwheel.shared.logout()
+                self.didPressLogout(true, nil)
+            } catch {
+                self.didPressLogout(false, error)
+            }
         }
     }
 
-    /**
-     This method provies an action to take when the button is in a logged out state.
-
-     */
-    open func loginAction() {
-        self.didPressLogin()
+    @objc open func loginAction() {
+        didPressLogin()
     }
 }
+
+#endif

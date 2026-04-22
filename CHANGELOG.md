@@ -1,6 +1,39 @@
 #Change Log
 All notable changes to this project will be documented in this file. starting with version 4.2.5
---- 
+---
+
+## [5.0.0] (2026-04-22)
+
+#### Drupal 10 / 11 support — major rewrite
+
+**Added**
+* Targets the Drupal 10 / 11 core RESTful Web Services API.
+* Full `async` / `await` API surface on `Waterwheel.shared`.
+* Swift Package Manager support (`Package.swift`).
+* Typed `EntityType` enum covering `node`, `comment`, `user`, `taxonomy_term`, `media`, and `file`.
+* `Authentication` enum with `.cookie`, `.basic(...)`, and `.bearer(...)` modes.
+* Automatic CSRF token refresh from `/session/token` with `X-CSRF-Token` header on unsafe requests.
+* `requestDecoded(_:path:method:query:body:)` generic helper for `Decodable` responses.
+* `Notification.Name` extensions for request lifecycle notifications.
+* Deprecated `WaterwheelCompat` namespace providing a closure-based bridge for 4.x callers.
+
+**Changed**
+* Minimum platforms raised to iOS 15 / macOS 12 / tvOS 15 / watchOS 8 (needed for `URLSession`'s async/await API).
+* Swift language version is now 5.9.
+* iOS UI helpers (`waterwheelAuthButton`, `waterwheelLoginViewController`,
+  `waterwheelViewTableViewController`) rebuilt on top of the async core and
+  guarded with `#if os(iOS)`.
+* Login endpoint uses `/user/login?_format=json` and stores `csrf_token` /
+  `logout_token` from the response.
+
+**Removed**
+* Alamofire dependency — replaced with `URLSession`.
+* SwiftyJSON dependency — replaced with `Codable` / `JSONDecoder`.
+* SwiftyUserDefaults dependency — replaced with `UserDefaults`.
+* ObjectMapper dependency — replaced with `Decodable`.
+* Carthage-specific wiring (Cartfile now empty); SwiftPM and CocoaPods are the
+  supported installation paths.
+
 
 ## [4.3.2](https://github.com/Acquia/waterwheel.swift/releases/tag/4.3.2) (03/24/2017)
 Released on Friday, March 24, 2017. All issues associated with this milestone can be found using this [filter](https://github.com/Acquia/waterwheel.swift/issues?q=milestone%3A4.3.2+is%3Aclosed).
