@@ -9,9 +9,13 @@ Pod::Spec.new do |s|
     CSRF token management.
 
     Ships two subspecs:
-      * Core (default)        — the `DrupalIOSSDK` module (networking layer).
-      * UI                    — the `DrupalIOSSDKUI` module with iOS UIKit
-                                helpers (auth button, login VC, views table).
+      * Core (default)        — the `DrupalIOSSDK` module, a closure-based
+                                DrupalClient value type with .live / .mock /
+                                .unimplemented factories and a SwiftUI
+                                EnvironmentKey for injection.
+      * UI                    — the `DrupalIOSSDKUI` module with SwiftUI
+                                helpers: DrupalAuthButton, DrupalLoginView,
+                                DrupalViewList.
   DESC
   s.homepage     = "https://github.com/kylebrowning/drupal-ios-sdk"
   s.author       = { "Kyle Browning" => "kylebrowning@me.com" }
@@ -33,12 +37,9 @@ Pod::Spec.new do |s|
   end
 
   s.subspec 'UI' do |ui|
-    ui.ios.deployment_target = '15.0'
+    # SwiftUI-based helpers; work on every Apple platform the core supports.
     ui.source_files = 'Sources/DrupalIOSSDKUI/*.swift'
     ui.dependency 'DrupalIOSSDK/Core'
-    # UI is iOS only — exclude from the non-iOS platforms.
-    ui.osx.source_files     = []
-    ui.tvos.source_files    = []
-    ui.watchos.source_files = []
+    ui.frameworks = 'SwiftUI'
   end
 end

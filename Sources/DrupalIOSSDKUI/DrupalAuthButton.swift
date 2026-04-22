@@ -1,79 +1,71 @@
 //
 //  DrupalAuthButton.swift
-//  DrupalIOSSDKUI — iOS only.
+//  DrupalIOSSDKUI — a SwiftUI button that reflects the injected Drupal
+//  client's logged-in state and triggers logout automatically when tapped
+//  while authenticated.
 //
 
-#if os(iOS)
-import UIKit
+#if canImport(SwiftUI)
+import SwiftUI
 import DrupalIOSSDK
 
-/// Button action state.
-public enum AuthAction: String {
-    case login
-    case logout
-}
+@available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
+public struct DrupalAuthButton: View {
 
-/// A `UIButton` subclass that stays in sync with ``Drupal/isLoggedIn``.
-///
-/// Assign closures to ``didPressLogin`` and ``didPressLogout`` to hook into
-/// the button's taps. The button re-configures itself whenever the SDK posts
-/// `.drupalDidFinishRequest`, so it always reflects the latest auth state.
-@available(iOS 15.0, *)
-open class DrupalAuthButton: UIButton {
+    @Environment(\.drupal) private var drupal
 
-    open var didPressLogin: () -> Void = { }
-    open var didPressLogout: (_ success: Bool, _ error: Error?) -> Void = { _, _ in }
+    @State private var isLoggedIn: Bool = false
+    @State private var isWorking: Bool = false
 
-    override public init(frame: CGRect) {
-        super.init(frame: frame)
-        initButton()
+    private let onLoginTap: () -> Void
+    private let onLogout: (Result<Void, Error>) -> Void
+    private let loginLabel: String
+    private let logoutLabel: String
+
+    public init(
+        loginLabel: String = "Login",
+        logoutLabel: String = "Logout",
+        onLoginTap: @escaping () -> Void,
+        onLogout: @escaping (Result<Void, Error>) -> Void = { _ in }
+    ) {
+        self.loginLabel = loginLabel
+        self.logoutLabel = logoutLabel
+        self.onLoginTap = onLoginTap
+        self.onLogout = onLogout
     }
 
-    required public init?(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
-        initButton()
-    }
-
-    deinit { NotificationCenter.default.removeObserver(self) }
-
-    private func initButton() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(configureButton),
-            name: .drupalDidFinishRequest,
-            object: nil)
-
-        translatesAutoresizingMaskIntoConstraints = false
-        setTitleColor(UIButton(type: .system).titleColor(for: .normal), for: .normal)
-        configureButton()
-    }
-
-    @objc open func configureButton() {
-        if Drupal.shared.isLoggedIn {
-            setTitle("Logout", for: .normal)
-            removeTarget(self, action: #selector(loginAction), for: .touchUpInside)
-            addTarget(self, action: #selector(logoutAction), for: .touchUpInside)
-        } else {
-            setTitle("Login", for: .normal)
-            removeTarget(self, action: #selector(logoutAction), for: .touchUpInside)
-            addTarget(self, action: #selector(loginAction), for: .touchUpInside)
-        }
-    }
-
-    @objc open func logoutAction() {
-        Task { @MainActor in
-            do {
-                try await Drupal.shared.logout()
-                self.didPressLogout(true, nil)
-            } catch {
-                self.didPressLogout(false, error)
+    public var body: some View {
+        Button {
+            guard !isWorking else { return }
+            if isLoggedIn {
+                Task { await performLogout() }
+            } else {
+                onLoginTap()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                if isWorking {
+                    ProgressView().controlSize(.small)
+                }
+                Text(isLoggedIn ? logoutLabel : loginLabel)
             }
         }
+        .disabled(isWorking)
+        .onAppear { isLoggedIn = drupal.isLoggedIn() }
+        .onReceive(NotificationCenter.default.publisher(for: .drupalDidLogin))  { _ in isLoggedIn = true }
+        .onReceive(NotificationCenter.default.publisher(for: .drupalDidLogout)) { _ in isLoggedIn = false }
     }
 
-    @objc open func loginAction() {
-        didPressLogin()
+    @MainActor
+    private func performLogout() async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            try await drupal.logout()
+            onLogout(.success(()))
+        } catch {
+            onLogout(.failure(error))
+        }
     }
 }
-
 #endif
