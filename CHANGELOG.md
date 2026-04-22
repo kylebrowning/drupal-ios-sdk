@@ -4,35 +4,57 @@ All notable changes to this project will be documented in this file. starting wi
 
 ## [5.0.0] (2026-04-22)
 
-#### Drupal 10 / 11 support — major rewrite
+#### Drupal 10 / 11 support — major rewrite + rebrand
+
+The project is renamed from **Waterwheel** to **Drupal iOS SDK**. The Swift
+module is now `DrupalIOSSDK`, the main client type is `Drupal.shared`, and the
+UIKit helpers live in a separate product, `DrupalIOSSDKUI`.
 
 **Added**
 * Targets the Drupal 10 / 11 core RESTful Web Services API.
-* Full `async` / `await` API surface on `Waterwheel.shared`.
-* Swift Package Manager support (`Package.swift`).
-* Typed `EntityType` enum covering `node`, `comment`, `user`, `taxonomy_term`, `media`, and `file`.
+* Full `async` / `await` API surface on `Drupal.shared`.
+* Swift Package Manager support via `Package.swift` shipping two products:
+  `DrupalIOSSDK` (core, all platforms) and `DrupalIOSSDKUI` (iOS-only UIKit).
+* Typed `EntityType` enum covering `node`, `comment`, `user`, `taxonomy_term`,
+  `media`, and `file`.
 * `Authentication` enum with `.cookie`, `.basic(...)`, and `.bearer(...)` modes.
-* Automatic CSRF token refresh from `/session/token` with `X-CSRF-Token` header on unsafe requests.
-* `requestDecoded(_:path:method:query:body:)` generic helper for `Decodable` responses.
-* `Notification.Name` extensions for request lifecycle notifications.
-* Deprecated `WaterwheelCompat` namespace providing a closure-based bridge for 4.x callers.
+* Automatic CSRF token refresh from `/session/token` with `X-CSRF-Token` header
+  on unsafe requests.
+* `requestDecoded(_:path:method:query:body:)` generic helper for `Decodable`
+  responses.
+* `Notification.Name` extensions for request lifecycle events:
+  `.drupalDidLogin`, `.drupalDidLogout`, `.drupalDidStartRequest`,
+  `.drupalDidFinishRequest`.
 
 **Changed**
-* Minimum platforms raised to iOS 15 / macOS 12 / tvOS 15 / watchOS 8 (needed for `URLSession`'s async/await API).
+* Module renamed: `import waterwheel` → `import DrupalIOSSDK`
+  (plus `import DrupalIOSSDKUI` for the UIKit helpers).
+* Main type renamed: `Waterwheel.shared` → `Drupal.shared`.
+* UI classes renamed and moved to `DrupalIOSSDKUI`:
+  * `waterwheelAuthButton` → `DrupalAuthButton`
+  * `waterwheelLoginViewController` → `DrupalLoginViewController`
+  * `waterwheelViewTableViewController` → `DrupalViewTableViewController`
+* Source tree reorganized under `Sources/DrupalIOSSDK/` and
+  `Sources/DrupalIOSSDKUI/`.
+* Minimum platforms raised to iOS 15 / macOS 12 / tvOS 15 / watchOS 8
+  (needed for `URLSession`'s async/await API).
 * Swift language version is now 5.9.
-* iOS UI helpers (`waterwheelAuthButton`, `waterwheelLoginViewController`,
-  `waterwheelViewTableViewController`) rebuilt on top of the async core and
-  guarded with `#if os(iOS)`.
 * Login endpoint uses `/user/login?_format=json` and stores `csrf_token` /
   `logout_token` from the response.
+* Podspec renamed `waterwheel.podspec` → `DrupalIOSSDK.podspec`, with `Core`
+  and `UI` subspecs.
+* The demo app (`DrupalIOSSDKDemo/`) was rewritten on the async API and now
+  links the local SPM package directly — no Carthage step required.
 
 **Removed**
 * Alamofire dependency — replaced with `URLSession`.
 * SwiftyJSON dependency — replaced with `Codable` / `JSONDecoder`.
 * SwiftyUserDefaults dependency — replaced with `UserDefaults`.
 * ObjectMapper dependency — replaced with `Decodable`.
-* Carthage-specific wiring (Cartfile now empty); SwiftPM and CocoaPods are the
-  supported installation paths.
+* Carthage wiring (Cartfile, submodules, `Carthage/Checkouts/*`) deleted.
+* The legacy multi-platform framework Xcode project (`waterwheel.xcodeproj`)
+  is removed. Open `Package.swift` directly in Xcode (or use `swift build`)
+  for all four Apple platforms. CocoaPods installs continue to work.
 
 
 ## [4.3.2](https://github.com/Acquia/waterwheel.swift/releases/tag/4.3.2) (03/24/2017)

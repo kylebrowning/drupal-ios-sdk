@@ -1,6 +1,0 @@
-[submodule "Carthage/Checkouts/AlamofireImage"]
-	url = https://github.com/Alamofire/AlamofireImage.git
-[submodule "Carthage/Checkouts/Alamofire"]
-	url = https://github.com/Alamofire/Alamofire.git
-[submodule "Carthage/Checkouts/SwiftyUserDefaults"]
-	url = https://github.com/radex/SwiftyUserDefaults.git

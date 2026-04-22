@@ -1,11 +1,13 @@
 // swift-tools-version:5.9
 import PackageDescription
 
-// Waterwheel 5.x ships as a single Swift module. The iOS-only UI helpers
-// are wrapped in `#if os(iOS)` guards so the module still builds for
-// macOS, tvOS, and watchOS using only the core networking layer.
+// Drupal iOS SDK — Swift SDK for the Drupal 10 / 11 RESTful Web Services API.
+//
+// Ships two products:
+//   * DrupalIOSSDK   — pure-Foundation core (works on iOS, macOS, tvOS, watchOS).
+//   * DrupalIOSSDKUI — iOS-only UIKit helpers: auth button, login VC, views.
 let package = Package(
-    name: "Waterwheel",
+    name: "DrupalIOSSDK",
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
@@ -13,24 +15,26 @@ let package = Package(
         .watchOS(.v8)
     ],
     products: [
-        .library(name: "Waterwheel", targets: ["Waterwheel"])
+        .library(name: "DrupalIOSSDK",   targets: ["DrupalIOSSDK"]),
+        .library(name: "DrupalIOSSDKUI", targets: ["DrupalIOSSDKUI"])
     ],
     dependencies: [],
     targets: [
         .target(
-            name: "Waterwheel",
-            path: "Sources",
+            name: "DrupalIOSSDK",
+            path: "Sources/DrupalIOSSDK",
             exclude: [
+                "DrupalIOSSDK.h",
                 "Info-iOS.plist",
                 "Info-macOS.plist",
                 "Info-tvOS.plist",
-                "Info-watchOS.plist",
-                "waterwheel.h"
-            ],
-            sources: [
-                "Shared",
-                "iOS"
+                "Info-watchOS.plist"
             ]
+        ),
+        .target(
+            name: "DrupalIOSSDKUI",
+            dependencies: ["DrupalIOSSDK"],
+            path: "Sources/DrupalIOSSDKUI"
         )
     ]
 )
