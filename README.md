@@ -1,293 +1,303 @@
+# Drupal iOS SDK
 
-![Waterwheel - Drupal SDK](https://raw.githubusercontent.com/acquia/waterwheel-swift/assets/waterwheel.png)
+[![SwiftPM compatible](https://img.shields.io/badge/SwiftPM-compatible-brightgreen.svg)](#swift-package-manager)
+![Swift version](https://img.shields.io/badge/swift-5.9-orange.svg)
+[![Drupal version](https://img.shields.io/badge/Drupal-10%20%7C%2011-blue.svg)]()
+[![Platforms](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS-green.svg)](#)
 
-[![CocoaPods](https://img.shields.io/cocoapods/v/waterwheel.svg?maxAge=43000)]()
-[![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](#carthage)
-![Swift version](https://img.shields.io/badge/swift-3.0-orange.svg)
-[![Drupal version](https://img.shields.io/badge/Drupal-8-blue.svg)]()
-[![CocoaPods](https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS-green.svg)](#)
+A Swift SDK for building iOS, macOS, tvOS, and watchOS apps on top of Drupal.
+It wraps the most common operations of Drupal's
+[RESTful Web Services API](https://www.drupal.org/docs/drupal-apis/restful-web-services-api/restful-web-services-api-overview)
+(Drupal 10 / 11) behind a small, modern Swift surface built on `async` /
+`await` and closure-based dependency injection — no singleton, no protocols.
 
-#### Waterwheel Swift SDK for `Drupal`
-###### Waterwheel makes using Drupal as a backend with iOS, macOS, tvOS, or watchOS enjoyable by combining the most used features of Drupal's API's in one SDK. - Formerly known as Drupal iOS SDK.
-
+> **History:** 5.x is a ground-up rewrite of the former
+> [waterwheel-swift](https://github.com/kylebrowning/waterwheel-swift) SDK.
+> The Swift module has been renamed `DrupalIOSSDK`, the main value type is
+> now `DrupalClient`, and UI has moved to SwiftUI in a separate product
+> `DrupalIOSSDKUI`. See [Migrating from 4.x](#migrating-from-4x).
 
 -------
 <p align="center">
-    <a href="#features-in-4x">Features</a> &bull;
-    <a href="#configuration">Configuration</a> &bull;
-    <a href="#usage">Usage</a> &bull;
+    <a href="#features">Features</a> &bull;
+    <a href="#requirements">Requirements</a> &bull;
     <a href="#installation">Installation</a> &bull;
-    <a href="#requirements">Requirements</a>
+    <a href="#the-drupalclient-di-pattern">The <code>DrupalClient</code> DI pattern</a> &bull;
+    <a href="#usage">Usage</a> &bull;
+    <a href="#swiftui-helpers">SwiftUI helpers</a> &bull;
+    <a href="#migrating-from-4x">Migrating from 4.x</a>
 </p>
 
 --------
 
-## Features in 4.x
-- [x] Session management
-- [x] Basic Auth
-- [x] Cookie Auth
-- [x] Entity CRUD
-- [x] Local caching
-- [x] LoginViewController
-- [x] AuthButton
-- [x] Views integration into Table Views
+## Features
 
-<a href="#">Back to Top</a>
+- [x] Drupal 10 / 11 core REST module
+- [x] `async` / `await` API built on `URLSession`
+- [x] **Closure-based dependency injection** (no singleton, no protocols) — inspired by [Kyle Browning's *Dependency Injection in SwiftUI Without the Ceremony*](https://kylebrowning.com/posts/dependency-injection-in-swiftui/)
+- [x] SwiftUI environment integration: `@Environment(\.drupal) var drupal`
+- [x] **No third-party dependencies** — zero Alamofire, zero SwiftyJSON, zero ObjectMapper
+- [x] Cookie session auth with automatic CSRF token management
+- [x] HTTP Basic auth and OAuth 2 Bearer token auth
+- [x] Entity CRUD (node, comment, user, taxonomy term, media, file — plus anything custom)
+- [x] Views REST export helper
+- [x] Separate SwiftUI helpers product: `DrupalAuthButton`, `DrupalLoginView`, `DrupalViewList`
+- [x] Swift Package Manager **and** CocoaPods support
 
-## Configuration
+## Package layout
 
-1. `import waterwheel`
-2. (Optional) If you're not using HTTPS you will have to enable the [NSAppTransportSecurity](http://stackoverflow.com/questions/31254725/transport-security-has-blocked-a-cleartext-http)
+| Product           | Module            | Platforms                        | Purpose                              |
+| ----------------- | ----------------- | -------------------------------- | ------------------------------------ |
+| `DrupalIOSSDK`    | `DrupalIOSSDK`    | iOS, macOS, tvOS, watchOS        | Closure-based `DrupalClient` + auth  |
+| `DrupalIOSSDKUI`  | `DrupalIOSSDKUI`  | iOS, macOS, tvOS, watchOS        | SwiftUI helpers (depends on core)    |
 
+## Requirements
+
+- iOS 15.0+ / macOS 12.0+ / tvOS 15.0+ / watchOS 8.0+
+- Swift 5.9 / Xcode 15+
+- Drupal 10 or 11 with the core `rest` module enabled and a user role permitted to use the `application/json` format
+
+## Installation
+
+### Swift Package Manager
+
+Add to `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/kylebrowning/drupal-ios-sdk.git", from: "5.0.0")
+]
+```
+
+Then opt into the products you need:
+
+```swift
+.product(name: "DrupalIOSSDK",   package: "drupal-ios-sdk"),   // networking / DI
+.product(name: "DrupalIOSSDKUI", package: "drupal-ios-sdk"),   // optional SwiftUI helpers
+```
+
+Or from Xcode: **File → Add Package Dependencies…** and paste the repo URL.
+
+### CocoaPods
+
+```ruby
+pod 'DrupalIOSSDK'               # core (default subspec)
+pod 'DrupalIOSSDK/UI'            # optional SwiftUI helpers
+```
+
+## The `DrupalClient` DI pattern
+
+`DrupalIOSSDK` exposes its entire API surface as a single value-type `struct`
+whose stored properties are `@Sendable` async closures. The struct itself *is*
+the protocol — different factory functions produce different instances:
+
+```swift
+public struct DrupalClient: Sendable {
+    public var login:   @Sendable (String, String) async throws -> LoginResponse
+    public var logout:  @Sendable () async throws -> Void
+    public var get:     @Sendable (EntityType, String, [String: String]) async throws -> Data
+    public var create:  @Sendable (EntityType, Data) async throws -> Data
+    public var update:  @Sendable (EntityType, String, Data) async throws -> Data
+    public var delete:  @Sendable (EntityType, String) async throws -> Void
+    public var view:    @Sendable (String, [String: String]) async throws -> Data
+    public var request: @Sendable (String, String, [String: String], Data?) async throws -> Data
+    // …plus isLoggedIn, csrfToken, setAuthentication, refreshCSRFToken
+}
+```
+
+The SDK ships three factories:
+
+| Factory              | What it does                                                              |
+| -------------------- | ------------------------------------------------------------------------- |
+| `.live(baseURL:)`    | Real `URLSession`-backed client. Use this in production.                  |
+| `.mock(initiallyLoggedIn:)` | In-memory fake for SwiftUI previews and tests.                      |
+| `.unimplemented`     | Every closure throws `DrupalError.unimplemented` — the Environment default so missing DI fails loudly. |
+
+Injection uses SwiftUI's environment system:
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .environment(\.drupal, .live(baseURL: URL(string: "https://example.com")!))
+        }
+    }
+}
+
+struct ContentView: View {
+    @Environment(\.drupal) private var drupal
+    var body: some View { /* use drupal.login, drupal.get, … */ }
+}
+```
+
+In tests or Xcode Previews, swap in `.mock()` or a custom `DrupalClient`
+built from your own closures:
+
+```swift
+#Preview {
+    ContentView()
+        .environment(\.drupal, .mock(initiallyLoggedIn: true))
+}
+
+let fake = DrupalClient(
+    login: { _, _ in LoginResponse(csrfToken: "t", logoutToken: "u", currentUser: nil) },
+    // …other closures…
+)
+```
 
 ## Usage
 
-The code below will give you access to the baseline of features for communicating to a Drupal site.
+All snippets assume `@Environment(\.drupal) private var drupal` (or a client
+passed in via initializer).
+
+### Authentication
+
 ```swift
-// Sets the URL to your Drupal site.
-waterwheel.setDrupalURL("http://waterwheel-swift.com")
+// Cookie session
+let session = try await drupal.login("admin", "hunter2")
+
+// HTTP Basic
+drupal.setAuthentication(.basic(username: "admin", password: "hunter2"))
+
+// OAuth 2 bearer
+drupal.setAuthentication(.bearer(token: accessToken))
+
+// Logout
+try await drupal.logout()
 ```
 
-It is important to note that waterwheel makes heavy uses of [Closures](https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Closures.html), which allows us to pass functions as returns, or store them in variables.
+CSRF tokens are fetched automatically from `/session/token` the first time an
+unsafe method is issued on a cookie-authenticated session. Force a refresh with
+`try await drupal.refreshCSRFToken()`.
 
-#### Login
+### Reading entities
 
-The code below will set up Basic Authentication for each API call.
 ```swift
-// Sets HTTPS Basic Authentication Credentials.
-waterwheel.setBasicAuthUsernameAndPassword("test", password: "test2");
+let data: Data = try await drupal.get(.node, "36", [:])          // raw
+
+struct MyNode: Decodable { /* … */ }
+let node: MyNode = try await drupal.get(MyNode.self, entity: .node, id: "36")
 ```
 
-If you do not want to use Basic Auth, and instead use a cookie, waterwheel provides an authentication method for doing so.
-Sessions are handled for you, and will restore state upon closing an app and reopening it.
+### Creating / updating entities
+
 ```swift
-waterwheel.login(usernameField.text!, password: passwordField.text!) { (success, response, json, error) in
-    if (success) {
-        print("logged in")
-    } else {
-        print("failed to login")
-    }
+struct NewArticle: Encodable {
+    let type: [[String: String]]
+    let title: [[String: String]]
+    let body: [[String: String]]
+}
+let payload = NewArticle(
+    type:  [["target_id": "article"]],
+    title: [["value": "Hello World"]],
+    body:  [["value": "How are you?"]]
+)
+try await drupal.create(.node, body: payload)
+try await drupal.update(.node, id: "36", body: payload)
+try await drupal.delete(.node, "36")
+```
+
+### Views REST export
+
+```swift
+let data = try await drupal.view("api/latest-articles", [:])
+```
+
+### Arbitrary requests
+
+```swift
+let data = try await drupal.request("some/custom/path", "GET", ["_format": "json"], nil)
+let decoded: MyType = try await drupal.get(MyType.self, path: "some/custom/path")
+```
+
+## SwiftUI helpers
+
+`DrupalIOSSDKUI` ships three SwiftUI views, each backed by
+`@Environment(\.drupal)`:
+
+### `DrupalAuthButton`
+
+A button that reads `drupal.isLoggedIn()` on appear and observes
+`.drupalDidLogin` / `.drupalDidLogout` notifications to stay in sync. Triggers
+logout automatically when tapped while authenticated.
+
+```swift
+DrupalAuthButton(
+    onLoginTap: { isPresentingLogin = true },
+    onLogout:   { result in print("logged out:", result) }
+)
+```
+
+### `DrupalLoginView`
+
+A ready-to-use username/password form that calls `drupal.login` and surfaces
+errors inline.
+
+```swift
+DrupalLoginView(
+    prefilledUsername: "demo",
+    onSuccess: { _ in dismiss() },
+    onCancel:  { dismiss() }
+)
+```
+
+### `DrupalViewList<Row, RowView>`
+
+Fetches a Drupal View's REST export and renders rows with a SwiftUI builder.
+
+```swift
+struct Article: Decodable, Identifiable {
+    let id: String
+    let title: String?
+}
+
+DrupalViewList<Article, AnyView>(viewPath: "frontpage") { article in
+    AnyView(Text(article.title ?? "Untitled"))
 }
 ```
 
-Waterwheel  provides a `waterwheelAuthButton` to place anywhere in your app. The code below is iOS specific because of its dependence on UIKit.
+## Running the demo
 
-```swift
-let loginButton = waterwheelAuthButton()
-// When we press Login, lets show our Login view controller.
-loginButton.didPressLogin = {
-  waterwheel.login(usernameField.text!, password: passwordField.text!) { (success, response, json, error) in
-      if (success) {
-          print("successful login")
-      } else {
-          print("failed to login")
-      }
-  }
-}
+1. Open `DrupalIOSSDKDemo/DrupalIOSSDKDemo-iOS/DrupalIOSSDKDemo-iOS.xcworkspace`
+   in Xcode 15+. The project declares a local Swift Package reference to the
+   repo root, so no Carthage or CocoaPods step is required.
+2. Edit `DrupalIOSSDKDemo-iOS/DrupalIOSSDKDemoApp.swift` and point
+   `.live(baseURL:)` at your Drupal site.
+3. Build and run on an iOS 15+ device or simulator.
 
-loginButton.didPressLogout = { (success, error) in
-    print("logged out")
-}
-self.view.addSubview(loginButton)
-```
+## Migrating from 4.x
 
-Taking this one step further, waterwheel also provides a `waterwheelLoginViewController`. You can subclass this controller and overwrite if needed. For our purposes we will use the default implementation.
+- **Module & types renamed.** `import waterwheel` → `import DrupalIOSSDK`.
+  Instead of a `Waterwheel.shared` singleton, you now construct (or inject)
+  a `DrupalClient`.
+- **Inject; don't reach for shared state.**
+  `waterwheel.setDrupalURL("...")` → `.environment(\.drupal, .live(baseURL: URL(string: "...")!))`
+  at your SwiftUI app root.
+- `waterwheel.login(username:password:) { ... }` → `try await drupal.login(username, password)`
+- `waterwheel.nodeGet(nodeId:)` → `try await drupal.get(.node, id, [:])`
+- `waterwheel.entityPost(entityType:params:)` → `try await drupal.create(.node, body: payload)`
+- `waterwheel.entityPatch(entityType:entityId:params:)` → `try await drupal.update(.node, id: id, body: payload)`
+- `waterwheel.entityDelete(...)` → `try await drupal.delete(.node, id)`
+- **UI moved to SwiftUI.** `waterwheelAuthButton`, `waterwheelLoginViewController`,
+  and `waterwheelViewTableViewController` (UIKit) were replaced by
+  `DrupalAuthButton`, `DrupalLoginView`, and `DrupalViewList` (SwiftUI).
+- Notification names moved to `.drupalDidLogin`, `.drupalDidLogout`,
+  `.drupalDidStartRequest`, `.drupalDidFinishRequest`.
+- `DataResponse<Any>` / `SwiftyJSON.JSON` return types are gone — use
+  `Codable`, `JSONDecoder`, or raw `Data`.
 
-First, we build our `waterwheelLoginViewController` and set our `loginRequestCompleted` and `logoutRequestCompleted` closures:
+## Drupal compatibility
 
-```swift
-// Lets build our default waterwheelLoginViewController.
-let vc = waterwheelLoginViewController()
-
-//Lets add our closure that will be run when the request is completed.
-vc.loginRequestCompleted = { (success, error) in
-    if (success) {
-        // Do something related to a successful login
-        print("successful login")
-        self.dismissViewControllerAnimated(true, completion: nil)
-    } else {
-        print (error)
-    }
-}
-vc.logoutRequestCompleted = { (success, error) in
-    if (success) {
-        print("successful logout")
-        // Do something related to a successful logout
-        self.dismissViewControllerAnimated(true, completion: nil)
-    } else {
-        print (error)
-    }
-}
-```
-Once that is done we can now tell our `waterwheelAuthButton` what to do when someone presses Login. Of course this can all be handled manually in your own implementation, but for our purposes, were just using what waterwheel provides. 
-
-Here we instantiate a new `waterwheelAuthButton` and tell it what we want to happen when someone presses login, and logout.
-
-```swift
-let loginButton = waterwheelAuthButton()
-// When we press Login, lets show our Login view controller.
-loginButton.didPressLogin = {
-    // Lets Present our Login View Controller since this closure is for the loginButton press
-    self.presentViewController(vc, animated: true, completion: nil)
-}
-
-loginButton.didPressLogout = { (success, error) in
-    print("logged out")
-}
-self.view.addSubview(loginButton)
-
-```
-
-Because these two Views know whether you are logged in or out, they will always show the correct state of buttons(Login, or Logout) and perform the approriate actions. The UI is up to you, but at its default you get username, password, submit, and cancel button. With all that said, you can ingore these classes and use the methods that waterwheel provides and deeply integrate into your own UI.
-
-
-### Node Methods
-
-
-#### Get
-
-```swift
-// Get Node 36
-waterwheel.nodeGet(nodeId: "36", params: nil, completionHandler: { (success, response, json, error) in
-  print(response)
-})
-```
-
-#### Create/post
-
-```swift
-//build our node body
-let body = [
-    "type": [
-        [
-            "target_id": "article"
-        ]
-    ],
-    "title": [
-        [
-            "value": "Hello World"
-        ]
-    ],
-    "body": [
-        [
-            "value": "How are you?"
-        ]
-    ]
-]
-
-// Create a new node.
-waterwheel.entityPost(entityType: .Node, params: body) { (success, response, json, error) in
-    if (success) {
-        print(response)
-    } else {
-        print(error)
-    }
-}
- ```
-
-#### Update/Put/PATCH
-
-```swift
-// Update an existing node
-waterwheel.nodePatch(nodeId: "36", node: body) { (success, response, json, error) in
-    print(response);
-}
-```
-
-#### Delete
-```swift
-// Delete an existing node
-waterwheel.nodeDelete(nodeId: "36", params: nil, completionHandler: { (success, response, json, error) in
-    print(response)
-})
-```
-
-## Entity Requests
-Since Node is rather specific, Watherweel provides entity methods as well for all entityTypes
-
-#### Entity Get
-
-```swift
-waterwheel.entityGet(entityType: .Node, entityId: "36", params: params, completionHandler: completionHandler)
-```
-
-#### Entity Post
-
-```swift
-waterwheel.sharedInstance.entityPost(entityType: .Node, params: node, completionHandler: completionHandler)
-```
-
-### Entity Patch
-
-```swift
-waterwheel.entityPatch(entityType: .Node, entityId: "36", params: nodeObject, completionHandler: completionHandler)
-```
-
-#### Entity Delete
-
-```swift
-waterwheel.entityDelete(entityType: .Node, entityId: entityId, params: params, completionHandler: completionHandler)
-```
-## Installation
-
-Waterwheel offers two installations paths. Pick your poison!
-
-## Installation
-
-#### CocoaPods
-
-If you're using CocoaPods, just add this line to your Podfile:
-
-```ruby
-pod 'waterwheel'
-```
-
-Install by running this command in your terminal:
-
-```sh
-pod install
-```
-
-Then import the library in all files where you use it:
-
-```swift
-import waterwheel
-```
-
-#### Carthage
-
-Just add to your Cartfile:
-
-```ruby
-github "acquia/waterwheel-swift"
-```
-Run `carthage update` to build the framework and drag the built `waterwheel.framework` into your Xcode project.
+| SDK version | Drupal version | Notes |
+| ----------- | -------------- | ----- |
+| 5.x         | Drupal 10, 11  | Swift 5.9, async/await, SwiftUI, closure-based DI, zero deps |
+| 4.x         | Drupal 8       | Swift 3, Alamofire 4, SwiftyJSON, module `waterwheel` |
+| 3.x         | Drupal 8       | Objective-C |
+| 2.x         | Drupal 6–7     | Obj-C, requires the `services` module |
 
 ## Communication
 
-- If you **need help**, use [Stack Overflow](http://stackoverflow.com/questions/tagged/waterwheel-swift). (Tag 'waterwheel-swift')
-- If you **found a bug**, open an issue.
-- If you **have a feature request**, open an issue.
-- If you **want to contribute**, submit a pull request.
-
-<a href="#">Back to Top</a>
-
-
-
-## Drupal Compatibility
-
-#### The framework is tracking Drupal 8. As new features come out in 8, they will be added ASAP. Since Drupal 7 and Drupal 8 are completely different in terms of API's, you will need to use the correct version of waterwheel depending on your Drupal version.
-
-
-
-## Requirements
-- iOS 8.0+ / Mac OS X 10.9+ / tvOS 9.0+ / watchOS 2.0+
-- Xcode 7.3+
-
-| waterwheel version  | Drupal Version |
-| ------------- | ------------- |
-|          [4.x](https://github.com/kylebrowning/waterwheel-swift/tree/4.x)         |            Drupal 8 (Swift)            |
-|          [3.x](https://github.com/kylebrowning/waterwheel-swift/tree/3.x)         |            Drupal 8 (Obj-C)                   |  |
-|          [2.x](https://github.com/kylebrowning/waterwheel-swift/tree/2.x)         |            Drupal 6-7 (Obj-C)              |        Requires [Services](http://drupal.org/project/services) module                                                                    |
-
-<a href="#">Back to Top</a>
+- Found a bug? Open an issue.
+- Want a feature? Open an issue or a pull request.
