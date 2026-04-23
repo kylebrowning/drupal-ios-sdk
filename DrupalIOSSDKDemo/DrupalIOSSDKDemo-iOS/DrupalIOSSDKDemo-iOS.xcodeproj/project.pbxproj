@@ -1,0 +1,317 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1D389C241D8B35CA002A7BB6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1D389C231D8B35CA002A7BB6 /* Assets.xcassets */; };
+		1DA0B0011D8B40A0002A7BB6 /* DrupalIOSSDKDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA0B0001D8B40A0002A7BB6 /* DrupalIOSSDKDemoApp.swift */; };
+		1DA0B0031D8B40A0002A7BB6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DA0B0021D8B40A0002A7BB6 /* ContentView.swift */; };
+		1DF0A0012601000000000001 /* DrupalIOSSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 1DF0A0011601000000000001 /* DrupalIOSSDK */; };
+		1DF0A0022601000000000001 /* DrupalIOSSDKUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1DF0A0021601000000000001 /* DrupalIOSSDKUI */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1D389C171D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DrupalIOSSDKDemo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1D389C231D8B35CA002A7BB6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1D389C281D8B35CA002A7BB6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1DA0B0001D8B40A0002A7BB6 /* DrupalIOSSDKDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrupalIOSSDKDemoApp.swift; sourceTree = "<group>"; };
+		1DA0B0021D8B40A0002A7BB6 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1D389C141D8B35CA002A7BB6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DF0A0012601000000000001 /* DrupalIOSSDK in Frameworks */,
+				1DF0A0022601000000000001 /* DrupalIOSSDKUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1D389C0E1D8B35CA002A7BB6 = {
+			isa = PBXGroup;
+			children = (
+				1D389C191D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS */,
+				1D389C181D8B35CA002A7BB6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1D389C181D8B35CA002A7BB6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1D389C171D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1D389C191D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS */ = {
+			isa = PBXGroup;
+			children = (
+				1DA0B0001D8B40A0002A7BB6 /* DrupalIOSSDKDemoApp.swift */,
+				1DA0B0021D8B40A0002A7BB6 /* ContentView.swift */,
+				1D389C231D8B35CA002A7BB6 /* Assets.xcassets */,
+				1D389C281D8B35CA002A7BB6 /* Info.plist */,
+			);
+			path = "DrupalIOSSDKDemo-iOS";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1D389C161D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1D389C2B1D8B35CA002A7BB6 /* Build configuration list for PBXNativeTarget "DrupalIOSSDKDemo-iOS" */;
+			buildPhases = (
+				1D389C131D8B35CA002A7BB6 /* Sources */,
+				1D389C141D8B35CA002A7BB6 /* Frameworks */,
+				1D389C151D8B35CA002A7BB6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "DrupalIOSSDKDemo-iOS";
+			packageProductDependencies = (
+				1DF0A0011601000000000001 /* DrupalIOSSDK */,
+				1DF0A0021601000000000001 /* DrupalIOSSDKUI */,
+			);
+			productName = "DrupalIOSSDKDemo-iOS";
+			productReference = 1D389C171D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1D389C0F1D8B35CA002A7BB6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				ORGANIZATIONNAME = "Drupal iOS SDK";
+				TargetAttributes = {
+					1D389C161D8B35CA002A7BB6 = {
+						CreatedOnToolsVersion = 15.0;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1D389C121D8B35CA002A7BB6 /* Build configuration list for PBXProject "DrupalIOSSDKDemo-iOS" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1D389C0E1D8B35CA002A7BB6;
+			packageReferences = (
+				1DF0A0000601000000000001 /* XCLocalSwiftPackageReference "../.." */,
+			);
+			productRefGroup = 1D389C181D8B35CA002A7BB6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1D389C161D8B35CA002A7BB6 /* DrupalIOSSDKDemo-iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1D389C151D8B35CA002A7BB6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1D389C241D8B35CA002A7BB6 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1D389C131D8B35CA002A7BB6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DA0B0011D8B40A0002A7BB6 /* DrupalIOSSDKDemoApp.swift in Sources */,
+				1DA0B0031D8B40A0002A7BB6 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1D389C291D8B35CA002A7BB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1D389C2A1D8B35CA002A7BB6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		1D389C2C1D8B35CA002A7BB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DrupalIOSSDKDemo-iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.drupal.iossdk.demo-iOS";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		1D389C2D1D8B35CA002A7BB6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DrupalIOSSDKDemo-iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = "org.drupal.iossdk.demo-iOS";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1D389C121D8B35CA002A7BB6 /* Build configuration list for PBXProject "DrupalIOSSDKDemo-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D389C291D8B35CA002A7BB6 /* Debug */,
+				1D389C2A1D8B35CA002A7BB6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1D389C2B1D8B35CA002A7BB6 /* Build configuration list for PBXNativeTarget "DrupalIOSSDKDemo-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D389C2C1D8B35CA002A7BB6 /* Debug */,
+				1D389C2D1D8B35CA002A7BB6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1DF0A0000601000000000001 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../..";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1DF0A0011601000000000001 /* DrupalIOSSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DrupalIOSSDK;
+		};
+		1DF0A0021601000000000001 /* DrupalIOSSDKUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DrupalIOSSDKUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 1D389C0F1D8B35CA002A7BB6 /* Project object */;
+}
